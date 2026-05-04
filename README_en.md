@@ -26,7 +26,7 @@ pip install -r ~/.qwen/skills/document-reader/requirements.txt
 
 ```bash
 # LibreOffice — for DOCX/XLSX → PDF
-# https://www.libreoffice.org/download/download/
+# https://www.libreoffice.org/download/
 
 # Pandoc — for DOCX ↔ Markdown
 # https://pandoc.org/installing.html

@@ -29,7 +29,7 @@ pip install -r ~/.qwen/skills/document-reader/requirements.txt
 
 ```bash
 # LibreOffice — для DOCX/XLSX → PDF
-# https://www.libreoffice.org/download/download/
+# https://www.libreoffice.org/download/
 
 # Pandoc — для DOCX ↔ Markdown
 # https://pandoc.org/installing.html

@@ -415,7 +415,7 @@ pdftoppm -jpeg -r 150 document.pdf page
 ## Требования для конвертации
 
 ### LibreOffice
-- **Windows:** https://www.libreoffice.org/download/download/
+- **Windows:** https://www.libreoffice.org/download/
 - **Linux:** `sudo apt install libreoffice`
 - **macOS:** `brew install --cask libreoffice`
 
