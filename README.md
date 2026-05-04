@@ -18,7 +18,7 @@
 
 ```bash
 # Склонировать репозиторий в папку навыков
-git clone https://github.com/ВАШ_АККАУНТ/qwen-skill-document-reader.git ~/.qwen/skills/document-reader
+git clone https://github.com/Jonecuper/qwen-skill-document-reader.git ~/.qwen/skills/document-reader
 
 # Установить зависимости
 pip install -r ~/.qwen/skills/document-reader/requirements.txt

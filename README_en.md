@@ -18,7 +18,7 @@ A universal skill for **Qwen Code** AI agent for reading and analyzing documents
 
 ```bash
 # Clone repository to skills folder
-git clone https://github.com/YOUR_ACCOUNT/qwen-skill-document-reader.git ~/.qwen/skills/document-reader
+git clone https://github.com/Jonecuper/qwen-skill-document-reader.git ~/.qwen/skills/document-reader
 
 # Install dependencies
 pip install -r ~/.qwen/skills/document-reader/requirements.txt
