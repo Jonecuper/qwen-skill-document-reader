@@ -12,7 +12,12 @@ python-docx>=1.0.0     # Чтение Word документов
 openpyxl>=3.1.0        # Работа с Excel файлами
 pandas>=2.0.0          # Анализ данных
 
+# Конвертация (не требуют pip установки, но должны быть в системе):
+# - pandoc    : DOCX <-> Markdown, DOCX -> HTML
+# - libreoffice: DOCX -> PDF, XLSX -> PDF
+
 # Опционально (для расширенных возможностей):
-# reportlab>=4.0.0     # Создание PDF
-# pytesseract>=0.3.0   # OCR для сканов (требует установки tesseract)
-# Pillow>=10.0.0       # Обработка изображений
+# docx2pdf>=0.1.0     # DOCX -> PDF (pip install)
+# reportlab>=4.0.0    # Создание PDF
+# pytesseract>=0.3.0  # OCR для сканов (требует tesseract)
+# Pillow>=10.0.0      # Обработка изображений

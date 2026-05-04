@@ -1,38 +1,63 @@
 ---
 name: document-reader
-description: Универсальный навык для чтения, анализа и извлечения данных из PDF, DOCX и XLSX файлов. Используй когда пользователь просит проанализировать документ, извлечь текст или таблицы из файла.
+description: Универсальный навык для чтения, анализа, извлечения данных и конвертации PDF, DOCX, XLSX файлов. Используй когда пользователь просит проанализировать документ, извлечь текст, таблицы или конвертировать файл.
 ---
 
 # Document Reader Skill
 
-Универсальный набор для работы с документами: PDF, Word (DOCX) и Excel (XLSX).
+Универсальный набор для работы с документами: PDF, Word (DOCX), Excel (XLSX) — чтение, анализ и конвертация.
+
+## Возможности
+
+| Операция | PDF | DOCX | XLSX | Markdown |
+|----------|-----|------|------|----------|
+| Чтение текста | ✅ | ✅ | ✅ | ✅ |
+| Извлечение таблиц | ✅ | ✅ | ✅ | — |
+| Метаданные | ✅ | ✅ | ✅ | — |
+| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML |
+
+---
 
 ## Быстрый старт
 
-### Извлечение текста из любого документа
+### Извлечение текста
 
 ```bash
-python ~/.qwen/skills/document-reader/scripts/extract_text.py <путь_к_файлу>
+python ~/.qwen/skills/document-reader/scripts/extract_text.py <файл>
 ```
 
-Скрипт автоматически определяет формат файла и извлекает текст.
+### Конвертация
+
+```bash
+# DOCX → PDF
+python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.docx --convert --to pdf
+
+# DOCX → Markdown
+python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.docx --convert --to md
+
+# Markdown → DOCX
+python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.md --convert --to docx
+```
 
 ### Интерактивный режим
 
 Просто опиши задачу естественным языком:
 - "Прочитай содержимое этого PDF"
-- "Извлеки таблицы из Excel файла"
-- "Что находится в этом документе?"
+- "Конвертируй DOCX в PDF"
+- "Извлеки таблицы из Excel"
+- "Преобразуй документ в Markdown"
 
 ---
 
 ## Поддерживаемые форматы
 
-| Формат | Расширение | Библиотека | Возможности |
-|--------|------------|------------|-------------|
-| PDF | `.pdf` | PyPDF2, pdfplumber | Текст, таблицы, метаданные |
-| Word | `.docx` | python-docx | Текст, таблицы, абзацы |
-| Excel | `.xlsx`, `.xls` | openpyxl, pandas | Данные, формулы, листы |
+| Формат | Расширение | Возможности |
+|--------|------------|-------------|
+| PDF | `.pdf` | Чтение, таблицы, метаданные |
+| Word | `.docx`, `.doc` | Чтение, конвертация |
+| Excel | `.xlsx`, `.xls` | Чтение, конвертация в PDF |
+| Markdown | `.md` | Чтение, конвертация |
+| HTML | `.html` | Конвертация |
 
 ---
 
@@ -148,17 +173,34 @@ for para in doc.paragraphs:
 
 ---
 
-## Конвертация в другие форматы
+## Конвертация документов
 
-### DOCX → Markdown (через pandoc)
+### Через скрипт (рекомендуется)
+
 ```bash
-pandoc document.docx -o output.md
+python extract_text.py input.docx --convert --to pdf
+python extract_text.py input.docx --convert --to md
+python extract_text.py input.md --convert --to docx
+python extract_text.py input.docx --convert --to html
 ```
 
-### DOCX → PDF (через LibreOffice)
-```bash
-soffice --headless --convert-to pdf document.docx
-```
+### Поддерживаемые направления
+
+| Из | В | Инструмент |
+|----|----|------------|
+| DOCX | PDF | LibreOffice |
+| DOCX | Markdown | Pandoc |
+| DOCX | HTML | Pandoc |
+| XLSX | PDF | LibreOffice |
+| Markdown | DOCX | Pandoc |
+| Markdown | HTML | Pandoc |
+| HTML | DOCX | Pandoc |
+| HTML | Markdown | Pandoc |
+
+### Требования
+
+- **LibreOffice** — для конвертации в PDF: https://www.libreoffice.org/
+- **Pandoc** — для конвертации через командную строку: https://pandoc.org/
 
 ---
 
@@ -189,13 +231,14 @@ df.to_csv("output.csv", index=False)
 ## Важные замечания
 
 1. **Установи зависимости**: `pip install -r ~/.qwen/skills/document-reader/requirements.txt`
-2. **Библиотека python-docx** используется для чтения DOCX
-3. **pandas** лучше для анализа данных, **openpyxl** — для работы с формулами
-4. Для расширенных возможностей (создание/редактирование) см. `reference.md`
+2. **Для конвертации** установи LibreOffice и/или Pandoc
+3. **python-docx** используется для чтения DOCX
+4. **pandas** лучше для анализа данных, **openpyxl** — для работы с формулами
+5. Для расширенных возможностей (создание/редактирование) см. `reference.md`
 
 ---
 
 ## См. также
 
-- `reference.md` — расширенная документация по всем форматам
-- `scripts/extract_text.py` — универсальный скрипт извлечения
+- `reference.md` — расширенная документация
+- `scripts/extract_text.py` — универсальный скрипт с поддержкой конвертации

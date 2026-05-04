@@ -334,17 +334,65 @@ wb.save("output.xlsx")
 
 ## Конвертация
 
-### DOCX → Markdown (pandoc)
+### Через extract_text.py (рекомендуется)
+
 ```bash
+# DOCX → PDF
+python extract_text.py doc.docx --convert --to pdf
+
+# DOCX → Markdown
+python extract_text.py doc.docx --convert --to md
+
+# DOCX → HTML
+python extract_text.py doc.docx --convert --to html
+
+# Markdown → DOCX
+python extract_text.py doc.md --convert --to docx
+
+# XLSX → PDF
+python extract_text.py table.xlsx --convert --to pdf
+```
+
+### Вручную через Pandoc
+
+```bash
+# DOCX → Markdown
 pandoc document.docx -o output.md
+
+# DOCX → HTML
+pandoc document.docx -o output.html
+
+# Markdown → DOCX
+pandoc document.md -o output.docx
+
+# HTML → Markdown
+pandoc document.html -o output.md
 
 # С track changes
 pandoc --track-changes=all document.docx -o output.md
 ```
 
-### DOCX → PDF (LibreOffice)
+### Вручную через LibreOffice
+
 ```bash
+# DOCX → PDF
 soffice --headless --convert-to pdf document.docx
+
+# XLSX → PDF
+soffice --headless --convert-to pdf spreadsheet.xlsx
+
+# Все файлы в папке
+soffice --headless --convert-to pdf --outdir ./output ./input/*.docx
+```
+
+### Python конвертация (docx2pdf)
+
+```python
+# pip install docx2pdf
+from docx2pdf import convert
+
+convert("input.docx", "output.pdf")
+convert("input.docx")  # Сохранит рядом с .docx
 ```
 
 ### XLSX → CSV
@@ -360,6 +408,25 @@ df.to_csv("file.csv", index=False)
 # Установка: sudo apt install poppler-utils
 pdftoppm -jpeg -r 150 document.pdf page
 # Создаёт page-1.jpg, page-2.jpg и т.д.
+```
+
+---
+
+## Требования для конвертации
+
+### LibreOffice
+- **Windows:** https://www.libreoffice.org/download/download/
+- **Linux:** `sudo apt install libreoffice`
+- **macOS:** `brew install --cask libreoffice`
+
+### Pandoc
+- **Windows:** https://pandoc.org/installing.html
+- **Linux:** `sudo apt install pandoc`
+- **macOS:** `brew install pandoc`
+
+### docx2pdf
+```bash
+pip install docx2pdf
 ```
 
 ---

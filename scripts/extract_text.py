@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Универсальный скрипт для извлечения текста из документов PDF, DOCX, XLSX.
+Универсальный скрипт для извлечения текста и конвертации документов PDF, DOCX, XLSX.
 
 Использование:
     python extract_text.py <путь_к_файлу> [опции]
@@ -10,12 +10,16 @@
     --tables      Извлекать таблицы (для PDF/XLSX)
     --metadata    Показать метаданные
     --output F    Сохранить результат в файл
+    --convert     Конвертировать файл
+    --to F        Формат для конвертации (pdf, docx, md, html)
     --help        Показать справку
 """
 
 import argparse
 import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -41,6 +45,10 @@ def print_error(msg):
 
 def print_success(msg):
     print(f"{Colors.GREEN}[OK]{Colors.ENDC} {msg}")
+
+
+def print_warning(msg):
+    print(f"{Colors.YELLOW}[WARN]{Colors.ENDC} {msg}")
 
 
 def detect_format(file_path: str) -> str:
@@ -254,6 +262,239 @@ def extract_txt(file_path: str, show_metadata: bool = False) -> dict:
     return result
 
 
+# ============================================================================
+# КОНВЕРТАЦИЯ ДОКУМЕНТОВ
+# ============================================================================
+
+def get_converter(to_format: str):
+    """Получить функцию конвертера для указанного формата."""
+    converters = {
+        'pdf': convert_to_pdf,
+        'docx': convert_to_docx,
+        'md': convert_to_markdown,
+        'html': convert_to_html,
+    }
+    return converters.get(to_format)
+
+
+def check_tool(name: str) -> bool:
+    """Проверить наличие утилиты в системе."""
+    return shutil.which(name) is not None
+
+
+def convert_to_pdf(input_path: str, output_path: str) -> dict:
+    """
+    Конвертировать документ в PDF.
+    Поддерживает: DOCX, XLSX -> PDF через LibreOffice
+    """
+    # Проверяем LibreOffice
+    if not check_tool('soffice') and not check_tool('libreoffice'):
+        return {
+            "error": "LibreOffice не установлен. Установите: https://www.libreoffice.org/",
+            "hint": "Windows: скачайте установщик с официального сайта"
+        }
+
+    try:
+        # LibreOffice headless mode
+        cmd = [
+            'soffice' if check_tool('soffice') else 'libreoffice',
+            '--headless',
+            '--convert-to', 'pdf',
+            '--outdir', str(Path(output_path).parent),
+            input_path
+        ]
+
+        print_info("Конвертация через LibreOffice...")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+        if result.returncode != 0:
+            return {"error": f"Ошибка конвертации: {result.stderr}"}
+
+        # LibreOffice создаёт файл с тем же именем, но .pdf
+        input_file = Path(input_path)
+        expected_output = Path(output_path).parent / f"{input_file.stem}.pdf"
+
+        # Если выходной путь не указан явно, используем результат
+        if not output_path or output_path == input_path:
+            output_path = str(expected_output)
+
+        return {
+            "success": True,
+            "input": input_path,
+            "output": output_path,
+            "tool": "LibreOffice"
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Таймаут конвертации (120 сек)"}
+    except Exception as e:
+        return {"error": f"Ошибка: {str(e)}"}
+
+
+def convert_to_docx(input_path: str, output_path: str) -> dict:
+    """
+    Конвертировать документ в DOCX.
+    Поддерживает: Markdown, HTML -> DOCX через pandoc
+    """
+    input_ext = Path(input_path).suffix.lower()
+
+    if input_ext not in ['.md', '.markdown', '.html', '.htm']:
+        return {
+            "error": f"Конвертация из {input_ext} в DOCX не поддерживается напрямую",
+            "hint": "Используйте: Markdown/HTML -> PDF или сначала конвертируйте в Markdown"
+        }
+
+    if not check_tool('pandoc'):
+        return {
+            "error": "Pandoc не установлен. Установите: https://pandoc.org/installing.html",
+            "hint": "Windows: choco install pandoc или скачайте установщик"
+        }
+
+    try:
+        # Формируем выходной путь
+        if not output_path or output_path == input_path:
+            output_path = str(Path(input_path).with_suffix('.docx'))
+
+        cmd = [
+            'pandoc',
+            input_path,
+            '-o', output_path
+        ]
+
+        print_info("Конвертация через Pandoc...")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+        if result.returncode != 0:
+            return {"error": f"Ошибка конвертации: {result.stderr}"}
+
+        return {
+            "success": True,
+            "input": input_path,
+            "output": output_path,
+            "tool": "Pandoc"
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Таймаут конвертации (60 сек)"}
+    except Exception as e:
+        return {"error": f"Ошибка: {str(e)}"}
+
+
+def convert_to_markdown(input_path: str, output_path: str) -> dict:
+    """
+    Конвертировать документ в Markdown.
+    Поддерживает: DOCX, HTML -> MD через pandoc
+    """
+    input_ext = Path(input_path).suffix.lower()
+
+    if input_ext not in ['.docx', '.doc', '.html', '.htm']:
+        return {
+            "error": f"Конвертация из {input_ext} в Markdown не поддерживается",
+            "hint": "Используйте: DOCX -> PDF или сначала конвертируйте в DOCX"
+        }
+
+    if not check_tool('pandoc'):
+        return {
+            "error": "Pandoc не установлен. Установите: https://pandoc.org/installing.html",
+            "hint": "Windows: choco install pandoc"
+        }
+
+    try:
+        if not output_path or output_path == input_path:
+            output_path = str(Path(input_path).with_suffix('.md'))
+
+        cmd = [
+            'pandoc',
+            input_path,
+            '-o', output_path
+        ]
+
+        print_info("Конвертация через Pandoc...")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+        if result.returncode != 0:
+            return {"error": f"Ошибка конвертации: {result.stderr}"}
+
+        return {
+            "success": True,
+            "input": input_path,
+            "output": output_path,
+            "tool": "Pandoc"
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Таймаут конвертации (60 сек)"}
+    except Exception as e:
+        return {"error": f"Ошибка: {str(e)}"}
+
+
+def convert_to_html(input_path: str, output_path: str) -> dict:
+    """
+    Конвертировать документ в HTML.
+    Поддерживает: DOCX, Markdown, PDF -> HTML через pandoc
+    """
+    if not check_tool('pandoc'):
+        return {
+            "error": "Pandoc не установлен. Установите: https://pandoc.org/installing.html",
+            "hint": "Windows: choco install pandoc"
+        }
+
+    try:
+        if not output_path or output_path == input_path:
+            output_path = str(Path(input_path).with_suffix('.html'))
+
+        cmd = [
+            'pandoc',
+            input_path,
+            '-o', output_path
+        ]
+
+        print_info("Конвертация через Pandoc...")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+        if result.returncode != 0:
+            return {"error": f"Ошибка конвертации: {result.stderr}"}
+
+        return {
+            "success": True,
+            "input": input_path,
+            "output": output_path,
+            "tool": "Pandoc"
+        }
+
+    except subprocess.TimeoutExpired:
+        return {"error": "Таймаут конвертации (60 сек)"}
+    except Exception as e:
+        return {"error": f"Ошибка: {str(e)}"}
+
+
+def convert_document(input_path: str, to_format: str, output_path: str = None) -> dict:
+    """
+    Конвертировать документ в указанный формат.
+
+    Args:
+        input_path: Путь к исходному файлу
+        to_format: Формат результата (pdf, docx, md, html)
+        output_path: Путь для сохранения (опционально)
+
+    Returns:
+        dict: Результат конвертации
+    """
+    converter = get_converter(to_format)
+
+    if not converter:
+        return {
+            "error": f"Неподдерживаемый формат: {to_format}",
+            "supported": ["pdf", "docx", "md", "html"]
+        }
+
+    if not os.path.exists(input_path):
+        return {"error": f"Файл не найден: {input_path}"}
+
+    print_info(f"Конвертация {Path(input_path).suffix} -> {to_format}")
+    return converter(input_path, output_path)
+
+
 def format_text_output(data: dict, max_table_rows: int = 20) -> str:
     """Форматировать результат для отображения в текстовом виде."""
     output = []
@@ -355,14 +596,20 @@ def format_text_output(data: dict, max_table_rows: int = 20) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Извлечение текста из PDF, DOCX, XLSX файлов",
+        description="Извлечение текста и конвертация PDF, DOCX, XLSX файлов",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Примеры использования:
+  # Извлечение текста
   python extract_text.py document.pdf
   python extract_text.py document.docx --metadata
   python extract_text.py spreadsheet.xlsx --tables
   python extract_text.py file.pdf --output result.json
+
+  # Конвертация
+  python extract_text.py document.docx --convert --to pdf
+  python extract_text.py document.docx --convert --to md
+  python extract_text.py file.md --convert --to docx
         """
     )
 
@@ -374,9 +621,15 @@ def main():
     parser.add_argument("--metadata", "-m", action="store_true",
                         help="Показать метаданные")
     parser.add_argument("--output", "-o",
-                        help="Сохранить результат в JSON файл")
+                        help="Сохранить результат в файл")
     parser.add_argument("--json", "-j", action="store_true",
                         help="Вывод в формате JSON")
+
+    # Аргументы конвертации
+    parser.add_argument("--convert", "-c", action="store_true",
+                        help="Конвертировать файл")
+    parser.add_argument("--to", choices=["pdf", "docx", "md", "html"],
+                        help="Формат для конвертации")
 
     args = parser.parse_args()
 
@@ -388,7 +641,28 @@ def main():
     file_size = os.path.getsize(args.file)
     print_info(f"Файл: {args.file} ({file_size / 1024:.1f} KB)")
 
-    # Определение формата
+    # Режим конвертации
+    if args.convert:
+        if not args.to:
+            print_error("Укажите формат конвертации: --to pdf|docx|md|html")
+            sys.exit(1)
+
+        print_info(f"Режим: Конвертация в {args.to.upper()}")
+        result = convert_document(args.file, args.to, args.output)
+
+        if "error" in result:
+            print_error(result["error"])
+            if "hint" in result:
+                print_warning(result["hint"])
+            sys.exit(1)
+
+        if result.get("success"):
+            print_success(f"Конвертация завершена!")
+            print_info(f"Инструмент: {result.get('tool')}")
+            print_info(f"Результат: {result.get('output')}")
+        return
+
+    # Режим извлечения текста
     fmt = args.format or detect_format(args.file)
 
     if fmt == "unknown":
