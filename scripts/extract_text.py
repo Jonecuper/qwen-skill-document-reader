@@ -1,0 +1,438 @@
+#!/usr/bin/env python3
+"""
+Универсальный скрипт для извлечения текста из документов PDF, DOCX, XLSX.
+
+Использование:
+    python extract_text.py <путь_к_файлу> [опции]
+
+Опции:
+    --format F    Принудительно указать формат (pdf, docx, xlsx)
+    --tables      Извлекать таблицы (для PDF/XLSX)
+    --metadata    Показать метаданные
+    --output F    Сохранить результат в файл
+    --help        Показать справку
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+# Цвета для консоли
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+
+
+def print_info(msg):
+    print(f"{Colors.CYAN}[INFO]{Colors.ENDC} {msg}")
+
+
+def print_error(msg):
+    print(f"{Colors.RED}[ERROR]{Colors.ENDC} {msg}")
+
+
+def print_success(msg):
+    print(f"{Colors.GREEN}[OK]{Colors.ENDC} {msg}")
+
+
+def detect_format(file_path: str) -> str:
+    """Определить формат файла по расширению."""
+    ext = Path(file_path).suffix.lower()
+    format_map = {
+        '.pdf': 'pdf',
+        '.docx': 'docx',
+        '.doc': 'docx',
+        '.xlsx': 'xlsx',
+        '.xls': 'xlsx',
+        '.txt': 'txt',
+    }
+    return format_map.get(ext, 'unknown')
+
+
+def extract_pdf(file_path: str, extract_tables: bool = False, show_metadata: bool = False) -> dict:
+    """Извлечь текст из PDF."""
+    try:
+        from PyPDF2 import PdfReader
+        import pdfplumber
+    except ImportError:
+        return {"error": "Установите библиотеки: pip install PyPDF2 pdfplumber"}
+
+    result = {"format": "pdf", "pages": []}
+
+    # Метаданные
+    if show_metadata:
+        reader = PdfReader(file_path)
+        result["metadata"] = {
+            "pages": len(reader.pages),
+            "title": getattr(reader.metadata, 'title', None),
+            "author": getattr(reader.metadata, 'author', None),
+            "subject": getattr(reader.metadata, 'subject', None),
+            "creator": getattr(reader.metadata, 'creator', None),
+        }
+
+    # Текст и таблицы
+    with pdfplumber.open(file_path) as pdf:
+        result["page_count"] = len(pdf.pages)
+
+        for i, page in enumerate(pdf.pages):
+            page_data = {"page": i + 1}
+
+            # Текст
+            text = page.extract_text()
+            if text:
+                page_data["text"] = text.strip()
+
+            # Таблицы
+            if extract_tables:
+                tables = page.extract_tables()
+                if tables:
+                    page_data["tables"] = []
+                    for j, table in enumerate(tables):
+                        if table:
+                            page_data["tables"].append({
+                                "table_num": j + 1,
+                                "rows": len(table),
+                                "data": table
+                            })
+
+            result["pages"].append(page_data)
+
+    return result
+
+
+def extract_docx(file_path: str, show_metadata: bool = False) -> dict:
+    """Извлечь текст из DOCX."""
+    try:
+        from docx import Document
+    except ImportError:
+        return {"error": "Установите библиотеку: pip install python-docx"}
+
+    doc = Document(file_path)
+    result = {
+        "format": "docx",
+        "paragraphs": [],
+        "tables": [],
+    }
+
+    # Метаданные
+    if show_metadata:
+        props = doc.core_properties
+        result["metadata"] = {
+            "author": props.author,
+            "title": props.title,
+            "subject": props.subject,
+            "keywords": props.keywords,
+        }
+
+    # Параграфы
+    for i, para in enumerate(doc.paragraphs):
+        if para.text.strip():
+            result["paragraphs"].append({
+                "num": i + 1,
+                "style": para.style.name if para.style else None,
+                "text": para.text.strip()
+            })
+
+    # Таблицы
+    for i, table in enumerate(doc.tables):
+        table_data = []
+        for row in table.rows:
+            row_data = [cell.text.strip() for cell in row.cells]
+            table_data.append(row_data)
+
+        if table_data:
+            result["tables"].append({
+                "num": i + 1,
+                "rows": len(table_data),
+                "cols": len(table_data[0]) if table_data else 0,
+                "data": table_data
+            })
+
+    return result
+
+
+def extract_xlsx(file_path: str, extract_tables: bool = False, show_metadata: bool = False) -> dict:
+    """Извлечь данные из XLSX."""
+    try:
+        from openpyxl import load_workbook
+        import pandas as pd
+    except ImportError:
+        return {"error": "Установите библиотеки: pip install openpyxl pandas"}
+
+    result = {
+        "format": "xlsx",
+        "sheets": [],
+    }
+
+    wb = load_workbook(file_path, data_only=True)
+    result["sheet_names"] = wb.sheetnames
+    result["sheet_count"] = len(wb.sheetnames)
+
+    # Метаданные
+    if show_metadata:
+        props = wb.properties
+        result["metadata"] = {
+            "title": props.title,
+            "author": props.creator,
+            "subject": props.subject,
+            "created": str(props.created) if props.created else None,
+        }
+
+    # Данные каждого листа
+    for sheet_name in wb.sheetnames:
+        sheet = wb[sheet_name]
+        sheet_data = {
+            "name": sheet_name,
+            "max_row": sheet.max_row,
+            "max_col": sheet.max_column,
+            "data": []
+        }
+
+        # Первые 100 строк для предпросмотра
+        rows_shown = 0
+        max_preview = 100
+
+        for row in sheet.iter_rows(max_row=max_preview, values_only=True):
+            if any(cell is not None for cell in row):
+                sheet_data["data"].append(list(row))
+                rows_shown += 1
+
+        if rows_shown < sheet.max_row:
+            sheet_data["truncated"] = True
+            sheet_data["total_rows"] = sheet.max_row
+            sheet_data["preview_rows"] = rows_shown
+
+        result["sheets"].append(sheet_data)
+
+    # Таблицы (если запрошено) - читаем через pandas
+    if extract_tables:
+        try:
+            xls = pd.ExcelFile(file_path)
+            result["tables"] = []
+            for sheet_name in xls.sheet_names:
+                df = pd.read_excel(xls, sheet_name=sheet_name)
+                if not df.empty:
+                    result["tables"].append({
+                        "sheet": sheet_name,
+                        "rows": len(df),
+                        "columns": list(df.columns),
+                        "data": df.head(50).to_dict('records')
+                    })
+        except Exception:
+            pass
+
+    wb.close()
+    return result
+
+
+def extract_txt(file_path: str, show_metadata: bool = False) -> dict:
+    """Извлечь текст из TXT."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    result = {
+        "format": "txt",
+        "text": content,
+        "lines": len(content.splitlines()),
+        "chars": len(content)
+    }
+
+    if show_metadata:
+        result["metadata"] = {
+            "size": os.path.getsize(file_path),
+            "encoding": "utf-8"
+        }
+
+    return result
+
+
+def format_text_output(data: dict, max_table_rows: int = 20) -> str:
+    """Форматировать результат для отображения в текстовом виде."""
+    output = []
+
+    fmt = data.get("format", "unknown")
+
+    if fmt == "pdf":
+        output.append(f"{Colors.BOLD}{Colors.HEADER}=== PDF Документ ==={Colors.ENDC}")
+
+        if "metadata" in data:
+            meta = data["metadata"]
+            output.append(f"Страниц: {meta.get('pages', '?')}")
+            if meta.get('title'):
+                output.append(f"Заголовок: {meta['title']}")
+            if meta.get('author'):
+                output.append(f"Автор: {meta['author']}")
+            output.append("")
+
+        for page_data in data.get("pages", []):
+            output.append(f"{Colors.BOLD}--- Страница {page_data['page']} ---{Colors.ENDC}")
+
+            if "text" in page_data:
+                output.append(page_data["text"])
+
+            if "tables" in page_data:
+                for table in page_data["tables"]:
+                    output.append(f"\n{Colors.YELLOW}Таблица {table['table_num']} ({table['rows']} строк):{Colors.ENDC}")
+                    for i, row in enumerate(table["data"][:max_table_rows]):
+                        output.append(" | ".join(str(cell) if cell else "" for cell in row))
+                    if table["rows"] > max_table_rows:
+                        output.append(f"... и ещё {table['rows'] - max_table_rows} строк")
+
+    elif fmt == "docx":
+        output.append(f"{Colors.BOLD}{Colors.HEADER}=== Word Документ ==={Colors.ENDC}")
+
+        if "metadata" in data:
+            meta = data["metadata"]
+            if meta.get('title'):
+                output.append(f"Заголовок: {meta['title']}")
+            if meta.get('author'):
+                output.append(f"Автор: {meta['author']}")
+            output.append("")
+
+        if data.get("paragraphs"):
+            output.append(f"{Colors.BOLD}Текст ({len(data['paragraphs'])} абзацев):{Colors.ENDC}")
+            for para in data["paragraphs"]:
+                if para.get("style") and para["style"] != "Normal":
+                    output.append(f"[{para['style']}]")
+                output.append(para["text"])
+                output.append("")
+
+        if data.get("tables"):
+            for table in data["tables"]:
+                output.append(f"\n{Colors.YELLOW}Таблица {table['num']} ({table['rows']}x{table['cols']}):{Colors.ENDC}")
+                for i, row in enumerate(table["data"][:max_table_rows]):
+                    output.append(" | ".join(cell for cell in row))
+                if table["rows"] > max_table_rows:
+                    output.append(f"... и ещё {table['rows'] - max_table_rows} строк")
+
+    elif fmt == "xlsx":
+        output.append(f"{Colors.BOLD}{Colors.HEADER}=== Excel Файл ==={Colors.ENDC}")
+
+        if "metadata" in data:
+            meta = data["metadata"]
+            if meta.get('title'):
+                output.append(f"Название: {meta['title']}")
+            if meta.get('author'):
+                output.append(f"Автор: {meta['author']}")
+            output.append("")
+
+        output.append(f"Листов: {data.get('sheet_count', 0)}")
+        output.append(f"Листы: {', '.join(data.get('sheet_names', []))}")
+        output.append("")
+
+        for sheet in data.get("sheets", []):
+            output.append(f"{Colors.BOLD}--- {sheet['name']} ({sheet['max_row']} строк, {sheet['max_col']} столбцов) ---{Colors.ENDC}")
+
+            if sheet.get("data"):
+                # Заголовок таблицы (первая строка)
+                header = sheet["data"][0] if sheet["data"] else []
+                output.append(" | ".join(str(cell) if cell else "" for cell in header))
+                output.append("-" * 50)
+
+                # Данные
+                for i, row in enumerate(sheet["data"][:max_table_rows]):
+                    output.append(" | ".join(str(cell) if cell else "" for cell in row))
+
+                if sheet.get("truncated"):
+                    output.append(f"\n... показано {sheet['preview_rows']} из {sheet['total_rows']} строк")
+
+    elif fmt == "txt":
+        output.append(f"{Colors.BOLD}{Colors.HEADER}=== Текстовый файл ==={Colors.ENDC}")
+        output.append(f"Строк: {data.get('lines', 0)}, Символов: {data.get('chars', 0)}")
+        output.append("")
+        output.append(data.get("text", ""))
+
+    return "\n".join(output)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Извлечение текста из PDF, DOCX, XLSX файлов",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Примеры использования:
+  python extract_text.py document.pdf
+  python extract_text.py document.docx --metadata
+  python extract_text.py spreadsheet.xlsx --tables
+  python extract_text.py file.pdf --output result.json
+        """
+    )
+
+    parser.add_argument("file", help="Путь к файлу")
+    parser.add_argument("--format", "-f", choices=["pdf", "docx", "xlsx", "txt"],
+                        help="Формат файла (определяется автоматически)")
+    parser.add_argument("--tables", "-t", action="store_true",
+                        help="Извлекать таблицы")
+    parser.add_argument("--metadata", "-m", action="store_true",
+                        help="Показать метаданные")
+    parser.add_argument("--output", "-o",
+                        help="Сохранить результат в JSON файл")
+    parser.add_argument("--json", "-j", action="store_true",
+                        help="Вывод в формате JSON")
+
+    args = parser.parse_args()
+
+    # Проверка файла
+    if not os.path.exists(args.file):
+        print_error(f"Файл не найден: {args.file}")
+        sys.exit(1)
+
+    file_size = os.path.getsize(args.file)
+    print_info(f"Файл: {args.file} ({file_size / 1024:.1f} KB)")
+
+    # Определение формата
+    fmt = args.format or detect_format(args.file)
+
+    if fmt == "unknown":
+        print_error(f"Неподдерживаемый формат файла: {args.file}")
+        sys.exit(1)
+
+    print_info(f"Формат: {fmt.upper()}")
+    print_info("Извлечение...")
+
+    # Извлечение данных
+    try:
+        if fmt == "pdf":
+            data = extract_pdf(args.file, args.tables, args.metadata)
+        elif fmt == "docx":
+            data = extract_docx(args.file, args.metadata)
+        elif fmt == "xlsx":
+            data = extract_xlsx(args.file, args.tables, args.metadata)
+        elif fmt == "txt":
+            data = extract_txt(args.file, args.metadata)
+        else:
+            data = {"error": f"Формат {fmt} не поддерживается"}
+    except Exception as e:
+        print_error(f"Ошибка при извлечении: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+    # Обработка ошибок
+    if "error" in data:
+        print_error(data["error"])
+        sys.exit(1)
+
+    # Вывод
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+    else:
+        print(format_text_output(data))
+
+    # Сохранение в файл
+    if args.output:
+        with open(args.output, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+        print_success(f"Сохранено: {args.output}")
+
+
+if __name__ == "__main__":
+    main()

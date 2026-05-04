@@ -1,0 +1,18 @@
+# Зависимости для Document Reader Skill
+# Установка: pip install -r requirements.txt
+
+# PDF обработка
+PyPDF2>=3.0.0          # Чтение PDF, метаданные
+pdfplumber>=0.10.0     # Извлечение текста и таблиц
+
+# DOCX обработка
+python-docx>=1.0.0     # Чтение Word документов
+
+# XLSX обработка
+openpyxl>=3.1.0        # Работа с Excel файлами
+pandas>=2.0.0          # Анализ данных
+
+# Опционально (для расширенных возможностей):
+# reportlab>=4.0.0     # Создание PDF
+# pytesseract>=0.3.0   # OCR для сканов (требует установки tesseract)
+# Pillow>=10.0.0       # Обработка изображений
