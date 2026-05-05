@@ -2,11 +2,20 @@
 name: document-reader
 description: Универсальный навык для чтения, анализа, извлечения данных и конвертации PDF, DOCX, XLSX файлов. Используй когда пользователь просит проанализировать документ, извлечь текст, таблицы или конвертировать файл.
 agent_instruction: |
-  При получении задачи на чтение/анализ PDF, DOCX или XLSX файла — сразу запускай:
-  python ~/.qwen/skills/document-reader/scripts/extract_text.py <путь_к_файлу>
-  
-  Не выводи инструкции и не пиши код вручную. Просто выполни команду и покажи результат.
-  Для конвертации добавь флаги: --convert --to pdf|md|docx|html
+  При получении задачи на чтение/анализ документа — сразу запускай:
+  python ~/.qwen/skills/document-reader/scripts/extract_text.py <путь_к_файлу> [опции]
+
+  Опции:
+    --tables      Извлечь таблицы
+    --metadata     Показать метаданные
+    --json         Вывод в JSON
+    --output FILE  Сохранить в файл
+    --convert      Конвертировать файл
+    --to FORMAT    Формат конвертации: pdf, docx, md, html
+    --ocr          Распознать текст (OCR, требует Tesseract)
+
+  Для конвертации: --convert --to pdf|docx|md|html
+  Для OCR: --ocr --lang rus+eng
 ---
 
 # Document Reader Skill
@@ -15,18 +24,17 @@ agent_instruction: |
 
 ## Возможности
 
-| Операция | PDF | DOCX | XLSX | Markdown | Сканы/Изображения |
-|----------|-----|------|------|----------|-------------------|
-| Чтение текста | ✅ | ✅ | ✅ | ✅ | ⚠️ OCR |
-| Извлечение таблиц | ✅ | ✅ | ✅ | — | ⚠️ OCR |
-| Метаданные | ✅ | ✅ | ✅ | — | — |
-| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML | — |
-
-> ⚠️ **OCR** — требует Tesseract (установка системная, не pip)
+| Операция | PDF | DOCX | XLSX | Markdown |
+|----------|-----|------|------|----------|
+| Чтение текста | ✅ | ✅ | ✅ | ✅ |
+| Извлечение таблиц | ✅ | ✅ | ✅ | — |
+| Метаданные | ✅ | ✅ | ✅ | — |
+| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/HTML |
+| OCR (сканы) | ✅ | — | — | — |
 
 ---
 
-## Быстрый старт
+## Использование
 
 ### Извлечение текста
 
@@ -34,315 +42,133 @@ agent_instruction: |
 python ~/.qwen/skills/document-reader/scripts/extract_text.py <файл>
 ```
 
-### Конвертация
+### Извлечение таблиц
 
 ```bash
-# DOCX → PDF
-python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.docx --convert --to pdf
-
-# DOCX → Markdown
-python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.docx --convert --to md
-
-# Markdown → DOCX
-python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.md --convert --to docx
+python ~/.qwen/skills/document-reader/scripts/extract_text.py <файл> --tables
 ```
 
-### Интерактивный режим
+### Показать метаданные
 
-Просто опиши задачу естественным языком:
-- "Прочитай содержимое этого PDF"
-- "Конвертируй DOCX в PDF"
-- "Извлеки таблицы из Excel"
-- "Преобразуй документ в Markdown"
-- "Распознай текст с этого скана"
+```bash
+python ~/.qwen/skills/document-reader/scripts/extract_text.py <файл> --metadata
+```
+
+### Сохранить в JSON
+
+```bash
+python ~/.qwen/skills/document-reader/scripts/extract_text.py <файл> --json --output result.json
+```
 
 ---
 
-## OCR — Распознавание текста (сканы, изображения)
+## Конвертация
 
-OCR позволяет извлекать текст из отсканированных документов и изображений.
+### DOCX → PDF
+```bash
+python extract_text.py doc.docx --convert --to pdf
+```
+
+### DOCX → Markdown
+```bash
+python extract_text.py doc.docx --convert --to md
+```
+
+### Markdown → DOCX
+```bash
+python extract_text.py doc.md --convert --to docx
+```
+
+### DOCX → HTML
+```bash
+python extract_text.py doc.docx --convert --to html
+```
+
+### XLSX → PDF
+```bash
+python extract_text.py table.xlsx --convert --to pdf
+```
+
+---
+
+## OCR — Распознавание текста
+
+Для распознавания текста со сканов и изображений.
 
 ### Установка
 
-1. **Tesseract OCR** (системная установка):
-   - **Windows:** https://github.com/UB-Mannheim/tesseract/wiki
-   - **Linux:** `sudo apt install tesseract-ocr`
-   - **macOS:** `brew install tesseract`
+1. **Tesseract OCR:**
+   - Windows: https://github.com/UB-Mannheim/tesseract/wiki
+   - Linux: `sudo apt install tesseract-ocr tesseract-ocr-rus`
+   - macOS: `brew install tesseract tesseract-lang`
 
-2. **Python библиотека:**
+2. **Python:**
    ```bash
    pip install pytesseract Pillow
    ```
 
 ### Использование
 
-```python
-import pytesseract
-from PIL import Image
-
+```bash
 # Распознать текст с изображения
-img = Image.open("scan.jpg")
-text = pytesseract.image_to_string(img, lang='rus+eng')
-print(text)
-```
+python extract_text.py scan.jpg --ocr --lang rus+eng
 
-### Скан PDF → текст
-
-```python
-import pytesseract
-from PIL import Image
-import pdfplumber
-
-with pdfplumber.open("scanned.pdf") as pdf:
-    for i, page in enumerate(pdf.pages):
-        # Конвертируем страницу PDF в изображение
-        img = page.to_image()
-        # Сохраняем временно
-        img_path = f"temp_page_{i}.png"
-        img.save(img_path)
-
-        # OCR
-        text = pytesseract.image_to_string(Image.open(img_path), lang='rus+eng')
-        print(f"=== Страница {i+1} ===")
-        print(text)
-```
-
-### Распознавание таблиц
-
-```python
-import pytesseract
-from PIL import Image
-
-img = Image.open("table_scan.jpg")
-# Распознать как таблицу
-data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-
-# Извлечь табличные данные
-lines = pytesseract.image_to_string(img)
-print(lines)
-```
-
-### Языки
-
-```python
-# Русский + английский
-text = pytesseract.image_to_string(img, lang='rus+eng')
+# Распознать текст из PDF-скана
+python extract_text.py scanned.pdf --ocr --lang rus+eng
 
 # Только русский
-text = pytesseract.image_to_string(img, lang='rus')
-
-# Только английский
-text = pytesseract.image_to_string(img, lang='eng')
+python extract_text.py scan.jpg --ocr --lang rus
 ```
 
-### Получение координат текста
+### Опции OCR
 
-```python
-import pytesseract
-from PIL import Image
-
-img = Image.open("document.jpg")
-data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-
-for i, text in enumerate(data['text']):
-    if text.strip():  # Не пустой текст
-        x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
-        conf = data['conf'][i]
-        print(f"{text} (x:{x}, y:{y}, conf:{conf})")
-```
+| Опция | Описание |
+|-------|----------|
+| `--ocr` | Включить режим OCR |
+| `--lang LANG` | Язык: `rus`, `eng`, `rus+eng` (по умолчанию) |
 
 ---
 
 ## Поддерживаемые форматы
 
-| Формат | Расширение | Возможности |
+| Формат | Расширения | Возможности |
 |--------|------------|-------------|
-| PDF | `.pdf` | Чтение, таблицы, метаданные |
-| Word | `.docx`, `.doc` | Чтение, конвертация |
-| Excel | `.xlsx`, `.xls` | Чтение, конвертация в PDF |
-| Markdown | `.md` | Чтение, конвертация |
-| HTML | `.html` | Конвертация |
+| PDF | `.pdf` | Текст, таблицы, метаданные, OCR |
+| Word | `.docx`, `.doc` | Текст, таблицы, конвертация |
+| Excel | `.xlsx`, `.xls` | Данные, листы, конвертация в PDF |
+| Markdown | `.md` | Конвертация в DOCX/HTML |
+| Изображения | `.jpg`, `.png`, `.tif` | OCR |
 
 ---
 
-## Извлечение данных
+## Требования
 
-### PDF — текст
-```python
-import pdfplumber
-
-with pdfplumber.open("document.pdf") as pdf:
-    for page in pdf.pages:
-        text = page.extract_text()
-        print(text)
-```
-
-### PDF — таблицы
-```python
-import pdfplumber
-
-with pdfplumber.open("document.pdf") as pdf:
-    for page in pdf.pages:
-        tables = page.extract_tables()
-        for table in tables:
-            print(table)
-```
-
-### DOCX — текст
-```python
-from docx import Document
-
-doc = Document("document.docx")
-for para in doc.paragraphs:
-    print(para.text)
-```
-
-### DOCX — таблицы
-```python
-from docx import Document
-
-doc = Document("document.docx")
-for table in doc.tables:
-    for row in table.rows:
-        print([cell.text for cell in row.cells])
-```
-
-### XLSX — данные (pandas)
-```python
-import pandas as pd
-
-df = pd.read_excel("spreadsheet.xlsx")
-print(df.head())
-print(df.describe())
-```
-
-### XLSX — данные (openpyxl)
-```python
-from openpyxl import load_workbook
-
-wb = load_workbook("spreadsheet.xlsx")
-for sheet_name in wb.sheetnames:
-    sheet = wb[sheet_name]
-    print(f"Лист: {sheet_name}")
-    for row in sheet.iter_rows(max_row=10, values_only=True):
-        print(row)
-```
-
----
-
-## Извлечение метаданных
-
-### PDF метаданные
-```python
-from PyPDF2 import PdfReader
-
-reader = PdfReader("document.pdf")
-meta = reader.metadata
-print(f"Автор: {meta.author}")
-print(f"Заголовок: {meta.title}")
-print(f"Страниц: {len(reader.pages)}")
-```
-
-### DOCX метаданные
-```python
-from docx import Document
-
-doc = Document("document.docx")
-props = doc.core_properties
-print(f"Автор: {props.author}")
-print(f"Заголовок: {props.title}")
-```
-
----
-
-## Анализ структуры
-
-### XLSX — список листов
-```python
-from openpyxl import load_workbook
-
-wb = load_workbook("spreadsheet.xlsx")
-print("Листы:", wb.sheetnames)
-```
-
-### DOCX — параграфы и стили
-```python
-from docx import Document
-
-doc = Document("document.docx")
-for para in doc.paragraphs:
-    if para.style.name:
-        print(f"[{para.style.name}] {para.text}")
-```
-
----
-
-## Конвертация документов
-
-### Через скрипт (рекомендуется)
-
+### Python зависимости
 ```bash
-python extract_text.py input.docx --convert --to pdf
-python extract_text.py input.docx --convert --to md
-python extract_text.py input.md --convert --to docx
-python extract_text.py input.docx --convert --to html
+pip install -r ~/.qwen/skills/document-reader/requirements.txt
 ```
 
-### Поддерживаемые направления
+### Системные инструменты (опционально)
 
-| Из | В | Инструмент |
-|----|----|------------|
-| DOCX | PDF | LibreOffice |
-| DOCX | Markdown | Pandoc |
-| DOCX | HTML | Pandoc |
-| XLSX | PDF | LibreOffice |
-| Markdown | DOCX | Pandoc |
-| Markdown | HTML | Pandoc |
-| HTML | DOCX | Pandoc |
-| HTML | Markdown | Pandoc |
-
-### Требования
-
-- **LibreOffice** — для конвертации в PDF: https://www.libreoffice.org/
-- **Pandoc** — для конвертации через командную строку: https://pandoc.org/
+| Инструмент | Для чего | Ссылка |
+|------------|----------|--------|
+| LibreOffice | DOCX/XLSX → PDF | https://www.libreoffice.org/download/ |
+| Pandoc | DOCX ↔ Markdown | https://pandoc.org/installing.html |
+| Tesseract | OCR | https://github.com/UB-Mannheim/tesseract/wiki |
 
 ---
 
-## Работа с файлами
+## Примеры задач
 
-### Получить информацию о файле
-```python
-import os
-
-path = "document.pdf"
-size = os.path.getsize(path)
-print(f"Размер: {size / 1024:.1f} KB")
-```
-
-### Сохранить извлечённые данные
-```python
-import pandas as pd
-
-# Сохранить таблицу в Excel
-df.to_excel("output.xlsx", index=False)
-
-# Или в CSV
-df.to_csv("output.csv", index=False)
-```
-
----
-
-## Важные замечания
-
-1. **Установи зависимости**: `pip install -r ~/.qwen/skills/document-reader/requirements.txt`
-2. **Для конвертации** установи LibreOffice и/или Pandoc
-3. **python-docx** используется для чтения DOCX
-4. **pandas** лучше для анализа данных, **openpyxl** — для работы с формулами
-5. Для расширенных возможностей (создание/редактирование) см. `reference.md`
+- "Прочитай содержимое этого PDF"
+- "Извлеки таблицы из Excel"
+- "Конвертируй DOCX в PDF"
+- "Распознай текст с этого скана"
+- "Сохрани содержимое в JSON"
 
 ---
 
 ## См. также
 
 - `reference.md` — расширенная документация
-- `scripts/extract_text.py` — универсальный скрипт с поддержкой конвертации
+- `scripts/extract_text.py --help` — справка по скрипту

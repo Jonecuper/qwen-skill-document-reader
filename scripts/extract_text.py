@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
-Универсальный скрипт для извлечения текста и конвертации документов PDF, DOCX, XLSX.
+Универсальный скрипт для извлечения текста, конвертации документов и OCR.
 
 Использование:
     python extract_text.py <путь_к_файлу> [опции]
 
 Опции:
-    --format F    Принудительно указать формат (pdf, docx, xlsx)
-    --tables      Извлекать таблицы (для PDF/XLSX)
+    --tables      Извлекать таблицы (PDF/XLSX)
     --metadata    Показать метаданные
     --output F    Сохранить результат в файл
+    --json        Вывод в формате JSON
     --convert     Конвертировать файл
     --to F        Формат для конвертации (pdf, docx, md, html)
+    --ocr         Распознать текст (OCR)
+    --lang L      Язык OCR (rus, eng, rus+eng)
     --help        Показать справку
 """
 
@@ -21,6 +23,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # Цвета для консоли
@@ -260,6 +263,131 @@ def extract_txt(file_path: str, show_metadata: bool = False) -> dict:
         }
 
     return result
+
+
+# ============================================================================
+# OCR — РАСПОЗНАВАНИЕ ТЕКСТА
+# ============================================================================
+
+def check_tesseract() -> bool:
+    """Проверить наличие Tesseract."""
+    try:
+        import pytesseract
+        pytesseract.pytesseract.tesseract_cmd  # Проверяем что можно импортировать
+        return True
+    except Exception:
+        return False
+
+
+def extract_ocr(file_path: str, lang: str = 'rus+eng') -> dict:
+    """
+    Распознать текст с изображения или PDF-скана через OCR.
+    """
+    try:
+        from PIL import Image
+        import pytesseract
+    except ImportError:
+        return {
+            "error": "Для OCR требуется: pip install pytesseract Pillow",
+            "hint": "Также установите Tesseract: https://github.com/UB-Mannheim/tesseract/wiki"
+        }
+
+    # Проверяем tesseract
+    if not check_tesseract():
+        return {
+            "error": "Tesseract не установлен",
+            "hint": "Windows: https://github.com/UB-Mannheim/tesseract/wiki\nLinux: sudo apt install tesseract-ocr"
+        }
+
+    ext = Path(file_path).suffix.lower()
+    result = {
+        "format": "ocr",
+        "source": ext,
+        "lang": lang,
+        "pages": []
+    }
+
+    try:
+        # Изображение (JPG, PNG, TIFF)
+        if ext in ['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.bmp']:
+            img = Image.open(file_path)
+            text = pytesseract.image_to_string(img, lang=lang)
+            result["pages"].append({
+                "page": 1,
+                "text": text.strip()
+            })
+
+        # PDF-скан
+        elif ext == '.pdf':
+            import pdfplumber
+
+            with pdfplumber.open(file_path) as pdf:
+                result["page_count"] = len(pdf.pages)
+
+                for i, page in enumerate(pdf.pages):
+                    try:
+                        # Конвертируем страницу PDF в изображение
+                        img = page.to_image()
+
+                        # Сохраняем во временный файл
+                        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                            tmp_path = tmp.name
+                            img.save(tmp_path)
+
+                        # OCR
+                        text = pytesseract.image_to_string(Image.open(tmp_path), lang=lang)
+
+                        result["pages"].append({
+                            "page": i + 1,
+                            "text": text.strip()
+                        })
+
+                        # Удаляем временный файл
+                        os.unlink(tmp_path)
+
+                    except Exception as e:
+                        result["pages"].append({
+                            "page": i + 1,
+                            "error": str(e)
+                        })
+
+        else:
+            return {
+                "error": f"OCR не поддерживает формат: {ext}",
+                "supported": [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".pdf"]
+            }
+
+    except Exception as e:
+        return {"error": f"Ошибка OCR: {str(e)}"}
+
+    return result
+
+
+def format_ocr_output(data: dict) -> str:
+    """Форматировать результат OCR."""
+    output = []
+    output.append(f"{Colors.BOLD}{Colors.HEADER}=== OCR Распознавание ==={Colors.ENDC}")
+    output.append(f"Источник: {data.get('source', '?')}")
+    output.append(f"Язык: {data.get('lang', '?')}")
+
+    if "page_count" in data:
+        output.append(f"Страниц: {data['page_count']}")
+
+    output.append("")
+
+    for page in data.get("pages", []):
+        if "error" in page:
+            output.append(f"{Colors.RED}Страница {page['page']}: Ошибка{Colors.ENDC}")
+            continue
+
+        output.append(f"{Colors.BOLD}--- Страница {page['page']} ---{Colors.ENDC}")
+        if page.get("text"):
+            output.append(page["text"])
+        else:
+            output.append(f"{Colors.YELLOW}Текст не обнаружен{Colors.ENDC}")
+        output.append("")
+
+    return "\n".join(output)
 
 
 # ============================================================================
@@ -596,7 +724,7 @@ def format_text_output(data: dict, max_table_rows: int = 20) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Извлечение текста и конвертация PDF, DOCX, XLSX файлов",
+        description="Извлечение текста, конвертация и OCR",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Примеры использования:
@@ -604,18 +732,19 @@ def main():
   python extract_text.py document.pdf
   python extract_text.py document.docx --metadata
   python extract_text.py spreadsheet.xlsx --tables
-  python extract_text.py file.pdf --output result.json
 
   # Конвертация
   python extract_text.py document.docx --convert --to pdf
   python extract_text.py document.docx --convert --to md
   python extract_text.py file.md --convert --to docx
+
+  # OCR
+  python extract_text.py scan.jpg --ocr --lang rus+eng
+  python extract_text.py scanned.pdf --ocr
         """
     )
 
     parser.add_argument("file", help="Путь к файлу")
-    parser.add_argument("--format", "-f", choices=["pdf", "docx", "xlsx", "txt"],
-                        help="Формат файла (определяется автоматически)")
     parser.add_argument("--tables", "-t", action="store_true",
                         help="Извлекать таблицы")
     parser.add_argument("--metadata", "-m", action="store_true",
@@ -625,11 +754,17 @@ def main():
     parser.add_argument("--json", "-j", action="store_true",
                         help="Вывод в формате JSON")
 
-    # Аргументы конвертации
+    # Конвертация
     parser.add_argument("--convert", "-c", action="store_true",
                         help="Конвертировать файл")
     parser.add_argument("--to", choices=["pdf", "docx", "md", "html"],
                         help="Формат для конвертации")
+
+    # OCR
+    parser.add_argument("--ocr", action="store_true",
+                        help="Распознать текст (OCR)")
+    parser.add_argument("--lang", default="rus+eng",
+                        help="Язык OCR (rus, eng, rus+eng)")
 
     args = parser.parse_args()
 
@@ -640,6 +775,28 @@ def main():
 
     file_size = os.path.getsize(args.file)
     print_info(f"Файл: {args.file} ({file_size / 1024:.1f} KB)")
+
+    # Режим OCR
+    if args.ocr:
+        print_info("Режим: OCR распознавание")
+        data = extract_ocr(args.file, args.lang)
+
+        if "error" in data:
+            print_error(data["error"])
+            if "hint" in data:
+                print_warning(data["hint"])
+            sys.exit(1)
+
+        if args.json:
+            print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(format_ocr_output(data))
+
+        if args.output:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+            print_success(f"Сохранено: {args.output}")
+        return
 
     # Режим конвертации
     if args.convert:
@@ -663,7 +820,7 @@ def main():
         return
 
     # Режим извлечения текста
-    fmt = args.format or detect_format(args.file)
+    fmt = detect_format(args.file)
 
     if fmt == "unknown":
         print_error(f"Неподдерживаемый формат файла: {args.file}")

@@ -5,9 +5,9 @@
 2. [PDF](#pdf)
 3. [DOCX](#docx)
 4. [XLSX](#xlsx)
-5. [OCR — распознавание](#ocr--распознавание)
-6. [Создание документов](#создание-документов)
-7. [Конвертация](#конвертация)
+5. [OCR](#ocr)
+6. [Конвертация](#конвертация)
+7. [Создание документов](#создание-документов)
 
 ---
 
@@ -449,7 +449,7 @@ python extract_text.py doc.md --convert --to docx
 python extract_text.py table.xlsx --convert --to pdf
 ```
 
-### Вручную через Pandoc
+### Через Pandoc
 
 ```bash
 # DOCX → Markdown
@@ -464,11 +464,11 @@ pandoc document.md -o output.docx
 # HTML → Markdown
 pandoc document.html -o output.md
 
-# С track changes
+# DOCX с track changes → Markdown
 pandoc --track-changes=all document.docx -o output.md
 ```
 
-### Вручную через LibreOffice
+### Через LibreOffice
 
 ```bash
 # DOCX → PDF
@@ -481,10 +481,13 @@ soffice --headless --convert-to pdf spreadsheet.xlsx
 soffice --headless --convert-to pdf --outdir ./output ./input/*.docx
 ```
 
-### Python конвертация (docx2pdf)
+### Через Python (docx2pdf)
+
+```bash
+pip install docx2pdf
+```
 
 ```python
-# pip install docx2pdf
 from docx2pdf import convert
 
 convert("input.docx", "output.pdf")
@@ -492,6 +495,7 @@ convert("input.docx")  # Сохранит рядом с .docx
 ```
 
 ### XLSX → CSV
+
 ```python
 import pandas as pd
 
@@ -499,31 +503,18 @@ df = pd.read_excel("file.xlsx")
 df.to_csv("file.csv", index=False)
 ```
 
-### PDF → изображения
-```bash
-# Установка: sudo apt install poppler-utils
-pdftoppm -jpeg -r 150 document.pdf page
-# Создаёт page-1.jpg, page-2.jpg и т.д.
-```
+### Поддерживаемые направления конвертации
 
----
-
-## Требования для конвертации
-
-### LibreOffice
-- **Windows:** https://www.libreoffice.org/download/
-- **Linux:** `sudo apt install libreoffice`
-- **macOS:** `brew install --cask libreoffice`
-
-### Pandoc
-- **Windows:** https://pandoc.org/installing.html
-- **Linux:** `sudo apt install pandoc`
-- **macOS:** `brew install pandoc`
-
-### docx2pdf
-```bash
-pip install docx2pdf
-```
+| Из | В | Инструмент |
+|----|----|------------|
+| DOCX | PDF | LibreOffice |
+| DOCX | Markdown | Pandoc |
+| DOCX | HTML | Pandoc |
+| XLSX | PDF | LibreOffice |
+| Markdown | DOCX | Pandoc |
+| Markdown | HTML | Pandoc |
+| HTML | DOCX | Pandoc |
+| HTML | Markdown | Pandoc |
 
 ---
 
