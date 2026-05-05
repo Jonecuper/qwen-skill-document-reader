@@ -273,10 +273,25 @@ def check_tesseract() -> bool:
     """Проверить наличие Tesseract."""
     try:
         import pytesseract
-        pytesseract.pytesseract.tesseract_cmd  # Проверяем что можно импортировать
+        # Добавляем путь если Tesseract установлен но не в PATH
+        tesseract_path = r'C:\Program Files\Tesseract-OCR'
+        if os.path.exists(tesseract_path):
+            pytesseract.pytesseract.tesseract_cmd = os.path.join(tesseract_path, 'tesseract.exe')
         return True
     except Exception:
         return False
+
+
+def set_poppler_path():
+    """Добавить путь к Poppler если нужно."""
+    poppler_paths = [
+        r'C:\Program Files\Poppler\Library\bin',
+        r'C:\Program Files (x86)\Poppler\Library\bin',
+        os.path.expandvars(r'%LOCALAPPDATA\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin'),
+    ]
+    for path in poppler_paths:
+        if os.path.exists(path) and path not in os.environ.get('PATH', ''):
+            os.environ['PATH'] = path + os.pathsep + os.environ.get('PATH', '')
 
 
 def extract_ocr(file_path: str, lang: str = 'rus+eng') -> dict:
@@ -319,37 +334,45 @@ def extract_ocr(file_path: str, lang: str = 'rus+eng') -> dict:
 
         # PDF-скан
         elif ext == '.pdf':
-            import pdfplumber
+            try:
+                import fitz  # PyMuPDF
 
-            with pdfplumber.open(file_path) as pdf:
-                result["page_count"] = len(pdf.pages)
+                doc = fitz.open(file_path)
+                result["page_count"] = len(doc)
 
-                for i, page in enumerate(pdf.pages):
+                for i, page in enumerate(doc):
                     try:
-                        # Конвертируем страницу PDF в изображение
-                        img = page.to_image()
+                        # Рендерим страницу в изображение
+                        mat = fitz.Matrix(2, 2)  # 2x zoom для лучшего качества
+                        pix = page.get_pixmap(matrix=mat)
+                        img_data = pix.tobytes("png")
 
-                        # Сохраняем во временный файл
-                        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                            tmp_path = tmp.name
-                            img.save(tmp_path)
+                        # Создаём изображение из байтов
+                        from io import BytesIO
+                        img = Image.open(BytesIO(img_data))
 
                         # OCR
-                        text = pytesseract.image_to_string(Image.open(tmp_path), lang=lang)
-
+                        text = pytesseract.image_to_string(img, lang=lang)
                         result["pages"].append({
                             "page": i + 1,
                             "text": text.strip()
                         })
-
-                        # Удаляем временный файл
-                        os.unlink(tmp_path)
 
                     except Exception as e:
                         result["pages"].append({
                             "page": i + 1,
                             "error": str(e)
                         })
+
+                doc.close()
+
+            except ImportError:
+                return {
+                    "error": "Для OCR PDF требуется: pip install pymupdf",
+                    "hint": "Или используйте OCR через веб-сервисы"
+                }
+            except Exception as e:
+                return {"error": f"Ошибка OCR PDF: {str(e)}"}
 
         else:
             return {
