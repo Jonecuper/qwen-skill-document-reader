@@ -4,24 +4,21 @@
 # PDF обработка
 PyPDF2>=3.0.0          # Чтение PDF, метаданные
 pdfplumber>=0.10.0     # Извлечение текста и таблиц
+pypdf>=4.0.0           # PDF формы, заполнение анкет
+pymupdf>=1.23.0        # OCR PDF рендеринг
 
 # DOCX обработка
 python-docx>=1.0.0     # Чтение Word документов
+defusedxml>=0.7.1      # Безопасная работа с XML
 
 # XLSX обработка
 openpyxl>=3.1.0        # Работа с Excel файлами
 pandas>=2.0.0          # Анализ данных
 
-# Конвертация (не требуют pip установки, но должны быть в системе):
-# - pandoc    : DOCX <-> Markdown, DOCX -> HTML
-# - libreoffice: DOCX -> PDF, XLSX -> PDF
+# OCR (требует системной установки Tesseract)
+pytesseract>=0.3.10   # OCR распознавание
+Pillow>=10.0.0        # Обработка изображений
 
-# Опционально (для расширенных возможностей):
-# docx2pdf>=0.1.0     # DOCX -> PDF (pip install)
+# Опционально:
 # reportlab>=4.0.0    # Создание PDF
-# pytesseract>=0.3.0  # OCR для сканов (требует tesseract)
-# Pillow>=10.0.0      # Обработка изображений
-
-# OCR зависимости (требуют системной установки Tesseract):
-# - Tesseract OCR: https://github.com/UB-Mannheim/tesseract/wiki
-# - pip: pytesseract, Pillow
+# pdf2image>=1.17.0   # Конвертация PDF в изображения
