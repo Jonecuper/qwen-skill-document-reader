@@ -21,3 +21,7 @@ pandas>=2.0.0          # Анализ данных
 # reportlab>=4.0.0    # Создание PDF
 # pytesseract>=0.3.0  # OCR для сканов (требует tesseract)
 # Pillow>=10.0.0      # Обработка изображений
+
+# OCR зависимости (требуют системной установки Tesseract):
+# - Tesseract OCR: https://github.com/UB-Mannheim/tesseract/wiki
+# - pip: pytesseract, Pillow

@@ -5,8 +5,9 @@
 2. [PDF](#pdf)
 3. [DOCX](#docx)
 4. [XLSX](#xlsx)
-5. [Создание документов](#создание-документов)
-6. [Конвертация](#конвертация)
+5. [OCR — распознавание](#ocr--распознавание)
+6. [Создание документов](#создание-документов)
+7. [Конвертация](#конвертация)
 
 ---
 
@@ -262,6 +263,101 @@ sheet["B2"] = '=IF(A1>5, "Да", "Нет")'
 
 wb.save("output.xlsx")
 ```
+
+---
+
+## OCR — распознавание
+
+### Установка
+
+**Tesseract OCR** (системная установка):
+- **Windows:** https://github.com/UB-Mannheim/tesseract/wiki
+- **Linux:** `sudo apt install tesseract-ocr tesseract-ocr-rus`
+- **macOS:** `brew install tesseract tesseract-lang`
+
+**Python библиотека:**
+```bash
+pip install pytesseract Pillow
+```
+
+### Базовое использование
+
+```python
+import pytesseract
+from PIL import Image
+
+# Распознать текст с изображения
+img = Image.open("scan.jpg")
+text = pytesseract.image_to_string(img, lang='rus+eng')
+print(text)
+```
+
+### Скан PDF → текст
+
+```python
+import pytesseract
+from PIL import Image
+import pdfplumber
+
+with pdfplumber.open("scanned.pdf") as pdf:
+    for i, page in enumerate(pdf.pages):
+        # Конвертируем страницу PDF в изображение
+        img = page.to_image()
+        img_path = f"temp_page_{i}.png"
+        img.save(img_path)
+
+        # OCR
+        text = pytesseract.image_to_string(Image.open(img_path), lang='rus+eng')
+        print(f"=== Страница {i+1} ===")
+        print(text)
+```
+
+### Распознавание таблиц
+
+```python
+import pytesseract
+from PIL import Image
+
+img = Image.open("table_scan.jpg")
+
+# Простое извлечение текста
+lines = pytesseract.image_to_string(img)
+print(lines)
+
+# С координатами
+data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+```
+
+### Настройка Tesseract
+
+```python
+import pytesseract
+
+# Указать путь к tesseract (если не в PATH)
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# Распознать с улучшенными параметрами
+custom_config = r'--oem 3 --psm 6'
+text = pytesseract.image_to_string(img, config=custom_config, lang='rus+eng')
+```
+
+### PSM режимы (Page Segmentation Mode)
+
+| Режим | Описание |
+|-------|----------|
+| 3 | Полностью автоматически (по умолчанию) |
+| 4 | Разделение на колонки |
+| 6 | Единый блок текста |
+| 11 | Разделение на строки |
+| 12 | Разделение на слова |
+
+### OEM режимы (OCR Engine Mode)
+
+| Режим | Описание |
+|-------|----------|
+| 3 | Нейросетевой (лучший результат) |
+| 1 | Legacy + LSTM |
+| 0 | Только legacy |
 
 ---
 

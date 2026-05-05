@@ -6,12 +6,14 @@
 
 ## Возможности
 
-| Операция | PDF | DOCX | XLSX | Markdown |
-|----------|-----|------|------|----------|
-| Чтение текста | ✅ | ✅ | ✅ | ✅ |
-| Извлечение таблиц | ✅ | ✅ | ✅ | — |
-| Метаданные | ✅ | ✅ | ✅ | — |
-| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML |
+| Операция | PDF | DOCX | XLSX | Markdown | Сканы/Изображения |
+|----------|-----|------|------|----------|-------------------|
+| Чтение текста | ✅ | ✅ | ✅ | ✅ | ⚠️ OCR |
+| Извлечение таблиц | ✅ | ✅ | ✅ | — | ⚠️ OCR |
+| Метаданные | ✅ | ✅ | ✅ | — | — |
+| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML | — |
+
+> ⚠️ **OCR** — требует Tesseract (системная установка)
 
 ## Установка
 
@@ -33,6 +35,17 @@ pip install -r ~/.qwen/skills/document-reader/requirements.txt
 
 # Pandoc — для DOCX ↔ Markdown
 # https://pandoc.org/installing.html
+```
+
+### Для OCR (опционально)
+
+```bash
+# Tesseract OCR — для распознавания сканов и изображений
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# Linux: sudo apt install tesseract-ocr tesseract-ocr-rus
+
+# Python зависимости
+pip install pytesseract Pillow
 ```
 
 ## Использование

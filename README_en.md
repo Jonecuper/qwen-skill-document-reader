@@ -6,12 +6,14 @@ A universal skill for **Qwen Code** AI agent for reading, analyzing and converti
 
 ## Features
 
-| Operation | PDF | DOCX | XLSX | Markdown |
-|-----------|-----|------|------|----------|
-| Read text | ✅ | ✅ | ✅ | ✅ |
-| Extract tables | ✅ | ✅ | ✅ | — |
-| Metadata | ✅ | ✅ | ✅ | — |
-| Convert | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML |
+| Operation | PDF | DOCX | XLSX | Markdown | Scans/Images |
+|-----------|-----|------|------|----------|---------------|
+| Read text | ✅ | ✅ | ✅ | ✅ | ⚠️ OCR |
+| Extract tables | ✅ | ✅ | ✅ | — | ⚠️ OCR |
+| Metadata | ✅ | ✅ | ✅ | — | — |
+| Convert | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML | — |
+
+> ⚠️ **OCR** — requires Tesseract (system installation)
 
 ## Installation
 
@@ -30,6 +32,17 @@ pip install -r ~/.qwen/skills/document-reader/requirements.txt
 
 # Pandoc — for DOCX ↔ Markdown
 # https://pandoc.org/installing.html
+```
+
+### For OCR (optional)
+
+```bash
+# Tesseract OCR — for recognizing scans and images
+# Windows: https://github.com/UB-Mannheim/tesseract/wiki
+# Linux: sudo apt install tesseract-ocr tesseract-ocr-rus
+
+# Python dependencies
+pip install pytesseract Pillow
 ```
 
 ## Usage

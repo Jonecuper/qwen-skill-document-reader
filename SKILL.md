@@ -9,12 +9,14 @@ description: Универсальный навык для чтения, анал
 
 ## Возможности
 
-| Операция | PDF | DOCX | XLSX | Markdown |
-|----------|-----|------|------|----------|
-| Чтение текста | ✅ | ✅ | ✅ | ✅ |
-| Извлечение таблиц | ✅ | ✅ | ✅ | — |
-| Метаданные | ✅ | ✅ | ✅ | — |
-| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML |
+| Операция | PDF | DOCX | XLSX | Markdown | Сканы/Изображения |
+|----------|-----|------|------|----------|-------------------|
+| Чтение текста | ✅ | ✅ | ✅ | ✅ | ⚠️ OCR |
+| Извлечение таблиц | ✅ | ✅ | ✅ | — | ⚠️ OCR |
+| Метаданные | ✅ | ✅ | ✅ | — | — |
+| Конвертация | — | →PDF/MD/HTML | →PDF | →DOCX/PDF/HTML | — |
+
+> ⚠️ **OCR** — требует Tesseract (установка системная, не pip)
 
 ---
 
@@ -46,6 +48,102 @@ python ~/.qwen/skills/document-reader/scripts/extract_text.py doc.md --convert -
 - "Конвертируй DOCX в PDF"
 - "Извлеки таблицы из Excel"
 - "Преобразуй документ в Markdown"
+- "Распознай текст с этого скана"
+
+---
+
+## OCR — Распознавание текста (сканы, изображения)
+
+OCR позволяет извлекать текст из отсканированных документов и изображений.
+
+### Установка
+
+1. **Tesseract OCR** (системная установка):
+   - **Windows:** https://github.com/UB-Mannheim/tesseract/wiki
+   - **Linux:** `sudo apt install tesseract-ocr`
+   - **macOS:** `brew install tesseract`
+
+2. **Python библиотека:**
+   ```bash
+   pip install pytesseract Pillow
+   ```
+
+### Использование
+
+```python
+import pytesseract
+from PIL import Image
+
+# Распознать текст с изображения
+img = Image.open("scan.jpg")
+text = pytesseract.image_to_string(img, lang='rus+eng')
+print(text)
+```
+
+### Скан PDF → текст
+
+```python
+import pytesseract
+from PIL import Image
+import pdfplumber
+
+with pdfplumber.open("scanned.pdf") as pdf:
+    for i, page in enumerate(pdf.pages):
+        # Конвертируем страницу PDF в изображение
+        img = page.to_image()
+        # Сохраняем временно
+        img_path = f"temp_page_{i}.png"
+        img.save(img_path)
+
+        # OCR
+        text = pytesseract.image_to_string(Image.open(img_path), lang='rus+eng')
+        print(f"=== Страница {i+1} ===")
+        print(text)
+```
+
+### Распознавание таблиц
+
+```python
+import pytesseract
+from PIL import Image
+
+img = Image.open("table_scan.jpg")
+# Распознать как таблицу
+data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+# Извлечь табличные данные
+lines = pytesseract.image_to_string(img)
+print(lines)
+```
+
+### Языки
+
+```python
+# Русский + английский
+text = pytesseract.image_to_string(img, lang='rus+eng')
+
+# Только русский
+text = pytesseract.image_to_string(img, lang='rus')
+
+# Только английский
+text = pytesseract.image_to_string(img, lang='eng')
+```
+
+### Получение координат текста
+
+```python
+import pytesseract
+from PIL import Image
+
+img = Image.open("document.jpg")
+data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+for i, text in enumerate(data['text']):
+    if text.strip():  # Не пустой текст
+        x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
+        conf = data['conf'][i]
+        print(f"{text} (x:{x}, y:{y}, conf:{conf})")
+```
 
 ---
 
