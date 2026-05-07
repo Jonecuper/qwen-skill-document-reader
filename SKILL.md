@@ -33,6 +33,7 @@ agent_instruction: |
 | OCR (сканы) | ✅ | — | — | — |
 | Заполнение форм | ✅ | — | — | — |
 | Пересчёт формул XLSX | — | — | ✅ | — |
+| Безопасное редактирование XLSX | — | — | ✅ XML | — |
 | Unpack/Pack DOCX | — | ✅ | — | — |
 
 ---
@@ -243,33 +244,59 @@ python recalc.py spreadsheet.xlsx 60
 
 ---
 
-## Поддерживаемые форматы
+## XLSX — Редактирование (КРИТИЧЕСКИ ВАЖНО!)
 
-| Формат | Расширения | Возможности |
-|--------|------------|-------------|
-| PDF | `.pdf` | Текст, таблицы, метаданные, OCR, формы |
-| Word | `.docx`, `.doc` | Текст, таблицы, конвертация, unpack/pack |
-| Excel | `.xlsx`, `.xls` | Данные, листы, конвертация в PDF, пересчёт формул |
-| Markdown | `.md` | Конвертация в DOCX/HTML |
-| Изображения | `.jpg`, `.png`, `.tif` | OCR |
+### ⚠️ Не используйте openpyxl для редактирования существующих файлов!
+
+`openpyxl.load_workbook()` + `wb.save()` **ломает**:
+- VBA-макросы (xlsm)
+- Pivot tables (сводные таблицы)
+- Sparklines (мини-графики)
+- Data validations
+- Условное форматирование
+
+### Правильный workflow: XML unpack → edit → pack
+
+```bash
+# 1. Распаковать xlsx (преобразует в XML)
+python ~/.qwen/skills/document-reader/scripts/xlsx_tools/unpack.py input.xlsx unpacked/
+
+# 2. Найти нужный sheet: xl/workbook.xml → xl/_rels/workbook.xml.rels
+
+# 3. Отредактировать XML напрямую:
+#    xl/worksheets/sheet1.xml — редактировать ячейки
+#    xl/styles.xml — редактировать форматирование
+
+# 4. Запаковать обратно
+python ~/.qwen/skills/document-reader/scripts/xlsx_tools/pack.py unpacked/ output.xlsx
+```
+
+### Почему XML?
+
+Excel (.xlsx) — это ZIP-архив с XML-файлами внутри. Прямое редактирование XML сохраняет все функции файла.
+
+### Когда можно openpyxl
+
+- Создание **нового** файла с нуля (без существующих формул/VBA)
+- Чтение данных для анализа (без сохранения)
+- `load_workbook(..., data_only=True)` — только чтение вычисленных значений
 
 ---
 
-## Требования
+## XLSX — Добавление формул (правильно)
 
-### Python зависимости
+### ❌ НЕПРАВИЛЬНО (хардкод)
 
-```bash
-pip install PyPDF2 pdfplumber python-docx openpyxl pandas pytesseract Pillow pymupdf defusedxml
+```python
+total = df['Sales'].sum()
+sheet['B10'] = total  # Результат 5000 — не формула!
 ```
 
-### Системные инструменты
+### ✅ ПРАВИЛЬНО (формула Excel)
 
-| Инструмент | Для чего | Ссылка |
-|------------|----------|--------|
-| LibreOffice | DOCX/XLSX → PDF | https://www.libreoffice.org/download/ |
-| Pandoc | DOCX ↔ Markdown/HTML | https://pandoc.org/installing.html |
-| Tesseract | OCR | https://github.com/UB-Mannheim/tesseract/wiki |
+```python
+sheet['B10'] = '=SUM(B2:B9)'  # Excel сам посчитает
+```
 
 ---
 
@@ -279,7 +306,7 @@ pip install PyPDF2 pdfplumber python-docx openpyxl pandas pytesseract Pillow pym
 scripts/
 ├── extract_text.py          # Основной скрипт (текст, таблицы, конвертация, OCR)
 ├── batch_convert.py         # Batch конвертация
-├── recalc.py               # Пересчёт формул XLSX
+├── recalc.py                # Пересчёт формул XLSX
 ├── pdf_forms/               # Работа с PDF формами
 │   ├── check_fillable_fields.py
 │   ├── extract_form_field_info.py
@@ -288,7 +315,10 @@ scripts/
 │   ├── check_bounding_boxes.py
 │   ├── create_validation_image.py
 │   └── fill_pdf_form_with_annotations.py
-└── docx_tools/             # Работа с DOCX XML
+├── docx_tools/              # Работа с DOCX XML
+│   ├── unpack.py
+│   └── pack.py
+└── xlsx_tools/             # Работа с XLSX XML (безопасное редактирование)
     ├── unpack.py
     └── pack.py
 ```
